@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 
-interface Node {
+export interface GraphNode {
   x: number;
   y: number;
   vx: number;
@@ -30,11 +30,11 @@ const COLORS = {
   leaf: { fill: "rgba(139, 92, 246, 0.6)", stroke: "rgba(139, 92, 246, 0.2)", glow: "rgba(139, 92, 246, 0.08)" },
 };
 
-function createGraph(w: number, h: number): { nodes: Node[]; edges: Edge[] } {
+function createGraph(w: number, h: number): { nodes: GraphNode[]; edges: Edge[] } {
   const cx = w / 2;
   const cy = h / 2;
   const count = Math.min(20, Math.max(12, Math.floor((w * h) / 25000)));
-  const nodes: Node[] = [];
+  const nodes: GraphNode[] = [];
   const edges: Edge[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -52,24 +52,27 @@ function createGraph(w: number, h: number): { nodes: Node[]; edges: Edge[] } {
     });
   }
 
-  // Create tree-like edges
   for (let i = 1; i < count; i++) {
     const parent = i < 3 ? 0 : i < 8 ? Math.floor(Math.random() * 3) : 3 + Math.floor(Math.random() * 5);
     edges.push({ from: parent, to: i });
   }
-  // Add a few cross-edges
   for (let i = 0; i < Math.floor(count * 0.3); i++) {
     const a = Math.floor(Math.random() * count);
-    let b = Math.floor(Math.random() * count);
+    const b = Math.floor(Math.random() * count);
     if (a !== b) edges.push({ from: a, to: b });
   }
 
   return { nodes, edges };
 }
 
-export default function GraphVisualization() {
+interface Props {
+  onNodeClick?: (node: GraphNode, index: number) => void;
+  selectedNode?: number | null;
+}
+
+export default function GraphVisualization({ onNodeClick, selectedNode }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const graphRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+  const graphRef = useRef<{ nodes: GraphNode[]; edges: Edge[] } | null>(null);
   const animRef = useRef<number>(0);
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
@@ -96,32 +99,46 @@ export default function GraphVisualization() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const findNode = (mx: number, my: number): number | null => {
+      const g = graphRef.current;
+      if (!g) return null;
+      for (let i = 0; i < g.nodes.length; i++) {
+        const n = g.nodes[i];
+        const dx = mx - n.x;
+        const dy = my - n.y;
+        if (dx * dx + dy * dy < 400) return i;
+      }
+      return null;
+    };
+
     const handleMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      
-      // Check hover
-      const g = graphRef.current;
-      if (!g) return;
-      let found: number | null = null;
-      for (let i = 0; i < g.nodes.length; i++) {
-        const n = g.nodes[i];
-        const dx = mouseRef.current.x - n.x;
-        const dy = mouseRef.current.y - n.y;
-        if (dx * dx + dy * dy < 400) { found = i; break; }
+      setHovered(findNode(mouseRef.current.x, mouseRef.current.y));
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const idx = findNode(mx, my);
+      if (idx !== null && graphRef.current && onNodeClick) {
+        e.stopPropagation();
+        onNodeClick(graphRef.current.nodes[idx], idx);
       }
-      setHovered(found);
     };
 
     const handleLeave = () => { mouseRef.current = null; setHovered(null); };
 
     canvas.addEventListener("mousemove", handleMove);
     canvas.addEventListener("mouseleave", handleLeave);
+    canvas.addEventListener("click", handleClick);
     return () => {
       canvas.removeEventListener("mousemove", handleMove);
       canvas.removeEventListener("mouseleave", handleLeave);
+      canvas.removeEventListener("click", handleClick);
     };
-  }, []);
+  }, [onNodeClick]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -133,7 +150,7 @@ export default function GraphVisualization() {
     const draw = () => {
       const g = graphRef.current;
       if (!g) { animRef.current = requestAnimationFrame(draw); return; }
-      
+
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -142,12 +159,9 @@ export default function GraphVisualization() {
 
       const mouse = mouseRef.current;
 
-      // Update positions with gentle floating
       for (const n of g.nodes) {
         n.x = n.baseX + Math.sin(time * 1.2 + n.baseX * 0.01) * 8;
         n.y = n.baseY + Math.cos(time * 0.9 + n.baseY * 0.01) * 6;
-
-        // Mouse repulsion
         if (mouse) {
           const dx = n.x - mouse.x;
           const dy = n.y - mouse.y;
@@ -160,27 +174,20 @@ export default function GraphVisualization() {
         }
       }
 
-      // Draw edges
       for (const e of g.edges) {
         const a = g.nodes[e.from];
         const b = g.nodes[e.to];
-        const isHighlighted = hovered === e.from || hovered === e.to;
-        
+        const isHighlighted = hovered === e.from || hovered === e.to || selectedNode === e.from || selectedNode === e.to;
+
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
-        
-        // Curved edges
         const mx = (a.x + b.x) / 2 + (a.y - b.y) * 0.1;
         const my = (a.y + b.y) / 2 + (b.x - a.x) * 0.1;
         ctx.quadraticCurveTo(mx, my, b.x, b.y);
-        
-        ctx.strokeStyle = isHighlighted
-          ? "rgba(168, 85, 247, 0.5)"
-          : "rgba(168, 85, 247, 0.12)";
+        ctx.strokeStyle = isHighlighted ? "rgba(168, 85, 247, 0.5)" : "rgba(168, 85, 247, 0.12)";
         ctx.lineWidth = isHighlighted ? 1.5 : 0.7;
         ctx.stroke();
 
-        // Animated particle along edge
         if (isHighlighted || Math.random() < 0.01) {
           const t = (time * 0.5 + e.from * 0.3) % 1;
           const px = (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * mx + t * t * b.x;
@@ -192,31 +199,38 @@ export default function GraphVisualization() {
         }
       }
 
-      // Draw nodes
       for (let i = 0; i < g.nodes.length; i++) {
         const n = g.nodes[i];
         const c = COLORS[n.type];
         const isHov = hovered === i;
+        const isSel = selectedNode === i;
 
-        // Glow
-        if (isHov || n.type === "core") {
+        if (isHov || isSel || n.type === "core") {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius * (isHov ? 5 : 3), 0, Math.PI * 2);
-          ctx.fillStyle = isHov ? "rgba(168, 85, 247, 0.15)" : c.glow;
+          ctx.arc(n.x, n.y, n.radius * (isHov || isSel ? 5 : 3), 0, Math.PI * 2);
+          ctx.fillStyle = isHov || isSel ? "rgba(168, 85, 247, 0.15)" : c.glow;
           ctx.fill();
         }
 
-        // Node circle
+        // Pulsing ring for selected
+        if (isSel) {
+          const pulseR = n.radius * 2.5 + Math.sin(time * 4) * 3;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, pulseR, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(236, 72, 153, 0.5)";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.radius * (isHov ? 1.5 : 1), 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, n.radius * (isHov || isSel ? 1.5 : 1), 0, Math.PI * 2);
         ctx.fillStyle = c.fill;
         ctx.fill();
-        ctx.strokeStyle = c.stroke;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = isSel ? "rgba(236, 72, 153, 0.8)" : c.stroke;
+        ctx.lineWidth = isSel ? 2 : 1;
         ctx.stroke();
 
-        // Label on hover
-        if (isHov) {
+        if (isHov || isSel) {
           ctx.font = "11px 'Space Grotesk', sans-serif";
           ctx.fillStyle = "rgba(255,255,255,0.85)";
           ctx.textAlign = "center";
@@ -229,7 +243,7 @@ export default function GraphVisualization() {
 
     animRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animRef.current);
-  }, [hovered]);
+  }, [hovered, selectedNode]);
 
   return (
     <canvas
