@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import GraphVisualization from "@/components/GraphVisualization";
 import logo from "@/assets/graphnous-logo.png";
 import {
   GitBranch,
@@ -41,6 +42,8 @@ const Navbar = () => (
 
 const Hero = () => (
   <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+    {/* Animated graph background */}
+    <GraphVisualization />
     {/* Background glow */}
     <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full gradient-bg opacity-[0.07] blur-[120px]" />
 
