@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import GraphVisualization from "@/components/GraphVisualization";
+import GraphVisualization, { type GraphNode } from "@/components/GraphVisualization";
+import AnalysisPanel from "@/components/AnalysisPanel";
 import logo from "@/assets/graphnous-logo.png";
 import {
   GitBranch,
@@ -40,62 +42,40 @@ const Navbar = () => (
   </nav>
 );
 
-const Hero = () => (
-  <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+const Hero = ({ selectedNode, onNodeClick, onClose }: {
+  selectedNode: { node: GraphNode; index: number } | null;
+  onNodeClick: (node: GraphNode, index: number) => void;
+  onClose: () => void;
+}) => (
+  <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden" onClick={onClose}>
     {/* Animated graph background */}
-    <GraphVisualization />
+    <GraphVisualization onNodeClick={onNodeClick} selectedNode={selectedNode?.index ?? null} />
     {/* Background glow */}
     <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full gradient-bg opacity-[0.07] blur-[120px]" />
 
-    <div className="container mx-auto px-6 text-center relative z-10">
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={0}
-        className="mb-6"
-      >
+    <div className="container mx-auto px-6 text-center relative z-10 pointer-events-none">
+      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="mb-6">
         <img src={logo} alt="Graphnous owl" className="h-24 w-24 mx-auto animate-float" />
       </motion.div>
 
-      <motion.p
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={1}
-        className="text-muted-foreground text-sm tracking-widest uppercase mb-4 font-heading"
-      >
+      <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={1}
+        className="text-muted-foreground text-sm tracking-widest uppercase mb-4 font-heading">
         νοῦς · Greek for "mind" — the intellect that sees
       </motion.p>
 
-      <motion.h1
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={2}
-        className="font-heading text-5xl md:text-7xl font-bold leading-tight mb-6 max-w-4xl mx-auto"
-      >
+      <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={2}
+        className="font-heading text-5xl md:text-7xl font-bold leading-tight mb-6 max-w-4xl mx-auto">
         Your codebase,{" "}
         <span className="gradient-text">understood by AI</span>
       </motion.h1>
 
-      <motion.p
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={3}
-        className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-10"
-      >
+      <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={3}
+        className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-10">
         Static analysis, dependency graphs, Merkle trees, hotspot detection &amp; god class alerts — powered by intelligence, not just rules.
       </motion.p>
 
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={4}
-        className="flex flex-col sm:flex-row items-center justify-center gap-4"
-      >
+      <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={4}
+        className="flex flex-col sm:flex-row items-center justify-center gap-4 pointer-events-auto">
         <Button variant="hero" size="lg" className="text-base px-8">
           Get started free <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
@@ -104,16 +84,13 @@ const Hero = () => (
         </Button>
       </motion.div>
 
-      <motion.p
-        initial="hidden"
-        animate="visible"
-        variants={fadeUp}
-        custom={5}
-        className="text-muted-foreground text-sm mt-6"
-      >
-        Free tier includes full project graph &amp; dependency tree
+      <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={5}
+        className="text-muted-foreground text-sm mt-6">
+        Free tier includes full project graph &amp; dependency tree · <span className="text-primary">click a node</span> to explore
       </motion.p>
     </div>
+
+    <AnalysisPanel node={selectedNode?.node ?? null} onClose={onClose} />
   </section>
 );
 
@@ -287,15 +264,23 @@ const Footer = () => (
   </footer>
 );
 
-const Index = () => (
-  <div className="min-h-screen bg-background">
-    <Navbar />
-    <Hero />
-    <Features />
-    <TechSection />
-    <CTA />
-    <Footer />
-  </div>
-);
+const Index = () => {
+  const [selectedNode, setSelectedNode] = useState<{ node: GraphNode; index: number } | null>(null);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <Hero
+        selectedNode={selectedNode}
+        onNodeClick={(node, index) => setSelectedNode({ node, index })}
+        onClose={() => setSelectedNode(null)}
+      />
+      <Features />
+      <TechSection />
+      <CTA />
+      <Footer />
+    </div>
+  );
+};
 
 export default Index;
